@@ -1,7 +1,8 @@
-#include "ble_reciever_app.h"
-#include <applications/services/gui/gui.h>
+// #include "ble_reciever_app.h"
+#include <gui/gui.h>
 #include <targets/furi_hal_include/furi_hal_bt.h>
 #include <gui/elements.h>
+#include <gui/view_dispatcher.h>
 
 typedef struct {
     FuriMutex* core2_mtx; // Mutex to control access to Core2 resources, ensuring safe access.
@@ -13,6 +14,8 @@ typedef struct {
     FuriString* status_string; // String to hold the display status (like RSSI and packet count).
     ViewDispatcher* view_dispatcher; // Manages display views and updates for GUI interaction.
 } BlePacketScannerApp; // Defines the structure type as "BlePacketScannerApp"
+
+#define EVENT_STOP 1
 
 void ble_packet_scanner_start(BlePacketScannerApp* app) {
     if(!app->is_scanning) { // Only start scanning if it’s not already active.
@@ -44,31 +47,16 @@ void ble_packet_scanner_process_packet(BlePacketScannerApp* app) {
         app->packet_count);
 }
 
+#define EVENT_UPDATE_DISPLAY 2 // Define a custom event code
+
 void ble_packet_scanner_update_display(BlePacketScannerApp* app) {
     // Format the display string with RSSI and packet count data.
-    furi_string_printf(app->status_string, "RSSI: %d dBm\nPackets: %d", app->rssi, app->packet_count);
-    
-    // Send a custom event to update the GUI with the new display information.
-    view_dispatcher_send_custom_event(app->view_dispatcher, app);
+    furi_string_printf(
+        app->status_string, "RSSI: %d dBm\nPackets: %d", app->rssi, app->packet_count);
+
+    // Pass an integer event code instead of app pointer
+    view_dispatcher_send_custom_event(app->view_dispatcher, EVENT_UPDATE_DISPLAY);
 }
-
-int32_t ble_packet_scanner_run(void* args) {
-    UNUSED(args); // Mark args as unused since it’s not needed here.
-    BlePacketScannerApp* app = ble_packet_scanner_app_init(); // Initialize the BLE packet scanner app.
-
-    ble_packet_scanner_start(app); // Start scanning for BLE packets.
-
-    while(app->is_scanning) { // Continue looping while scanning is active.
-        ble_packet_scanner_process_packet(app); // Process received packets and capture RSSI.
-        ble_packet_scanner_update_display(app); // Update the display with the latest packet information.
-        furi_delay_ms(500); // Delay for 500 ms between updates to reduce processing frequency.
-    }
-
-    ble_packet_scanner_stop(app); // Stop scanning when the loop exits.
-    free(app); // Free the allocated memory for the app structure.
-    return 0; // Return 0 to indicate success.
-}
-
 
 static bool ble_packet_scanner_custom_event_callback(void* context, uint32_t event) {
     BlePacketScannerApp* app = context; // Retrieve the app context from the event callback.
@@ -102,8 +90,29 @@ BlePacketScannerApp* ble_packet_scanner_app_init(void) {
         view_dispatcher_alloc(); // Allocate memory for the view dispatcher, managing GUI views.
     view_dispatcher_set_event_callback_context(
         app->view_dispatcher, app); // Set the context for event callbacks to the app instance.
+    view_dispatcher_set_custom_event_callback(
+        app->view_dispatcher, ble_packet_scanner_custom_event_callback);
 
     return app; // Return a pointer to the initialized app structure.
+}
+
+int32_t ble_packet_scanner_run(void* args) {
+    UNUSED(args); // Mark args as unused since it’s not needed here.
+    BlePacketScannerApp* app =
+        ble_packet_scanner_app_init(); // Initialize the BLE packet scanner app.
+
+    ble_packet_scanner_start(app); // Start scanning for BLE packets.
+
+    while(app->is_scanning) { // Continue looping while scanning is active.
+        ble_packet_scanner_process_packet(app); // Process received packets and capture RSSI.
+        ble_packet_scanner_update_display(
+            app); // Update the display with the latest packet information.
+        furi_delay_ms(500); // Delay for 500 ms between updates to reduce processing frequency.
+    }
+
+    ble_packet_scanner_stop(app); // Stop scanning when the loop exits.
+    free(app); // Free the allocated memory for the app structure.
+    return 0; // Return 0 to indicate success.
 }
 
 int32_t ble_reciever_app(void* p) {
