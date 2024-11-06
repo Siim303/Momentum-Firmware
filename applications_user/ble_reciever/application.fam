@@ -1,0 +1,16 @@
+App(
+    appid="ble_reciever_app",
+    name="BLE Reciever",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="ble_reciever_app",
+    stack_size=2 * 1024,
+    fap_icon="ble_reciever_10px.png",
+    fap_category="Bluetooth",
+    fap_file_assets="assets",
+    fap_author="@Siim303",
+    fap_weburl="",
+    fap_version="0.1",
+    fap_description="Scan surrounding BLE notifications and signals",
+    fap_icon_assets="icons",
+    fap_icon_assets_symbol="ble_reciever",
+)
